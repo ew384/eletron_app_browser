@@ -1,0 +1,150 @@
+/**
+ * IPC处理器 - 主进程与渲染进程通信桥梁
+ */
+import { ipcMain } from 'electron';
+import { IPC_CHANNELS, APP_CONFIG } from '@shared/constants';
+import type { WindowManager } from './window-manager';
+import type { IpcResponse, AccountConfig } from '@shared/types';
+
+export function setupIpcHandlers(windowManager: WindowManager): void {
+  // 浏览器实例管理
+  ipcMain.handle(
+    IPC_CHANNELS.CREATE_BROWSER_INSTANCE,
+    async (event, accountId: string, config?: AccountConfig): Promise<IpcResponse> => {
+      try {
+        const instance = await windowManager.createBrowserInstance(accountId, config);
+        return {
+          success: true,
+          data: instance
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.DESTROY_BROWSER_INSTANCE,
+    async (event, accountId: string): Promise<IpcResponse> => {
+      try {
+        const success = windowManager.destroyInstance(accountId);
+        return {
+          success,
+          data: success
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.GET_INSTANCE_STATUS,
+    async (event, accountId: string): Promise<IpcResponse<string>> => {
+      try {
+        const status = windowManager.getInstanceStatus(accountId);
+        return {
+          success: true,
+          data: status
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    }
+  );
+
+  // 预留扩展处理器
+  ipcMain.handle(
+    IPC_CHANNELS.INJECT_FINGERPRINT,
+    async (event, accountId: string, fingerprint: any): Promise<IpcResponse> => {
+      try {
+        // 预留指纹注入实现
+        console.log('Fingerprint injection requested for:', accountId, fingerprint);
+        return {
+          success: true,
+          data: 'Fingerprint injection completed'
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.UPDATE_PROXY,
+    async (event, accountId: string, proxy: any): Promise<IpcResponse> => {
+      try {
+        // 预留代理更新实现
+        console.log('Proxy update requested for:', accountId, proxy);
+        return {
+          success: true,
+          data: 'Proxy update completed'
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.EXECUTE_BEHAVIOR,
+    async (event, accountId: string, behavior: any): Promise<IpcResponse> => {
+      try {
+        // 预留行为执行实现
+        console.log('Behavior execution requested for:', accountId, behavior);
+        return {
+          success: true,
+          data: 'Behavior execution completed'
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+    }
+  );
+
+  // 应用信息
+  ipcMain.handle('get-app-version', async (): Promise<string> => {
+    return APP_CONFIG.version;
+  });
+
+  // 窗口控制
+  ipcMain.on('minimize-window', (event) => {
+    const window = windowManager.getAllInstances().get('main') || 
+                   require('electron').BrowserWindow.getFocusedWindow();
+    window?.minimize();
+  });
+
+  ipcMain.on('maximize-window', (event) => {
+    const window = windowManager.getAllInstances().get('main') || 
+                   require('electron').BrowserWindow.getFocusedWindow();
+    if (window?.isMaximized()) {
+      window.restore();
+    } else {
+      window?.maximize();
+    }
+  });
+
+  ipcMain.on('close-window', (event) => {
+    const window = windowManager.getAllInstances().get('main') || 
+                   require('electron').BrowserWindow.getFocusedWindow();
+    window?.close();
+  });
+}

@@ -1,0 +1,233 @@
+/**
+ * 窗口管理器 - 策略模式设计，预留扩展接口
+ */
+import { BrowserWindow, screen } from 'electron';
+import path from 'path';
+import { WINDOW_CONFIG, DEFAULT_USER_AGENTS } from '@shared/constants';
+import type { AccountConfig, BrowserInstance, WindowManagerState } from '@shared/types';
+
+export class WindowManager {
+  private state: WindowManagerState = {
+    browserInstances: new Map()
+  };
+  
+  private isDev: boolean;
+
+  constructor(isDev = false) {
+    this.isDev = isDev;
+  }
+
+  /**
+   * 创建主控制窗口
+   */
+  async createMainWindow(): Promise<BrowserWindow> {
+    const { width, height, minWidth, minHeight } = WINDOW_CONFIG.main;
+    
+    const mainWindow = new BrowserWindow({
+      width,
+      height,
+      minWidth,
+      minHeight,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, '../preload/index.js')
+      },
+      titleBarStyle: 'default',
+      show: false // 先隐藏，加载完成后显示
+    });
+
+    // 加载应用界面
+    if (this.isDev) {
+      await mainWindow.loadURL('http://localhost:3000');
+      mainWindow.webContents.openDevTools();
+    } else {
+      await mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    }
+
+    // 优雅显示窗口
+    mainWindow.once('ready-to-show', () => {
+      mainWindow.show();
+    });
+
+    this.state.mainWindow = mainWindow;
+    this.setupMainWindowHandlers(mainWindow);
+    
+    return mainWindow;
+  }
+
+  /**
+   * 创建浏览器实例 - 使用策略模式，支持配置注入
+   */
+  async createBrowserInstance(accountId: string, config?: AccountConfig): Promise<BrowserInstance> {
+    const { width, height } = config?.viewport || WINDOW_CONFIG.browser;
+    
+    // 应用配置策略
+    const browserConfig = this.buildBrowserConfig(accountId, config);
+    
+    const browserWindow = new BrowserWindow({
+      width,
+      height,
+      webPreferences: browserConfig.webPreferences,
+      show: false
+    });
+
+    // 应用用户代理策略
+    if (config?.userAgent) {
+      browserWindow.webContents.setUserAgent(config.userAgent);
+    } else {
+      // 随机选择默认User-Agent
+      const randomUA = DEFAULT_USER_AGENTS[Math.floor(Math.random() * DEFAULT_USER_AGENTS.length)];
+      browserWindow.webContents.setUserAgent(randomUA);
+    }
+
+    // 应用代理策略 (预留)
+    if (config?.proxy) {
+      await this.applyProxyConfig(browserWindow, config.proxy);
+    }
+
+    // 预留指纹注入点
+    if (config?.fingerprint) {
+      await this.injectFingerprint(browserWindow, config.fingerprint);
+    }
+
+    // 导航到起始页面
+    await browserWindow.loadURL('https://www.google.com');
+    
+    browserWindow.show();
+    this.state.browserInstances.set(accountId, browserWindow);
+    this.setupBrowserInstanceHandlers(browserWindow, accountId);
+
+    return {
+      accountId,
+      windowId: browserWindow.id,
+      status: 'running',
+      url: browserWindow.webContents.getURL()
+    };
+  }
+
+  /**
+   * 构建浏览器配置 - 策略模式
+   */
+  private buildBrowserConfig(accountId: string, config?: AccountConfig) {
+    return {
+      webPreferences: {
+        partition: `persist:${accountId}`, // 数据隔离
+        preload: path.join(__dirname, '../preload/index.js'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        webSecurity: true,
+        // 预留注入点
+        additionalArguments: this.buildChromiumArgs(config)
+      }
+    };
+  }
+
+  /**
+   * 构建Chromium启动参数 - 预留扩展点
+   */
+  private buildChromiumArgs(config?: AccountConfig): string[] {
+    const args: string[] = [];
+    
+    // 基础参数
+    args.push('--disable-web-security');
+    args.push('--disable-features=VizDisplayCompositor');
+    
+    // 预留指纹参数注入点
+    if (config?.fingerprint) {
+      // 后续实现指纹相关参数
+    }
+    
+    return args;
+  }
+
+  /**
+   * 应用代理配置 - 策略模式预留
+   */
+  private async applyProxyConfig(window: BrowserWindow, proxyConfig: any): Promise<void> {
+    // 预留代理配置实现
+    console.log('Applying proxy config:', proxyConfig);
+  }
+
+  /**
+   * 注入指纹配置 - 策略模式预留
+   */
+  private async injectFingerprint(window: BrowserWindow, fingerprint: any): Promise<void> {
+    // 预留指纹注入实现
+    console.log('Injecting fingerprint:', fingerprint);
+  }
+
+  /**
+   * 销毁浏览器实例
+   */
+  destroyInstance(accountId: string): boolean {
+    const window = this.state.browserInstances.get(accountId);
+    if (window && !window.isDestroyed()) {
+      window.close();
+      this.state.browserInstances.delete(accountId);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 获取实例状态
+   */
+  getInstanceStatus(accountId: string): string | undefined {
+    const window = this.state.browserInstances.get(accountId);
+    if (!window || window.isDestroyed()) {
+      return 'stopped';
+    }
+    return window.isVisible() ? 'running' : 'starting';
+  }
+
+  /**
+   * 获取所有实例
+   */
+  getAllInstances(): Map<string, BrowserWindow> {
+    return this.state.browserInstances;
+  }
+
+  /**
+   * 设置主窗口事件处理器
+   */
+  private setupMainWindowHandlers(window: BrowserWindow): void {
+    window.on('closed', () => {
+      this.state.mainWindow = undefined;
+    });
+
+    // 预留主窗口特殊处理
+  }
+
+  /**
+   * 设置浏览器实例事件处理器
+   */
+  private setupBrowserInstanceHandlers(window: BrowserWindow, accountId: string): void {
+    window.on('closed', () => {
+      this.state.browserInstances.delete(accountId);
+    });
+
+    // 预留实例状态监控
+    window.webContents.on('did-navigate', (event, url) => {
+      console.log(`Instance ${accountId} navigated to: ${url}`);
+    });
+  }
+
+  /**
+   * 清理资源
+   */
+  cleanup(): void {
+    // 关闭所有浏览器实例
+    this.state.browserInstances.forEach((window, accountId) => {
+      if (!window.isDestroyed()) {
+        window.close();
+      }
+    });
+    this.state.browserInstances.clear();
+
+    // 关闭主窗口
+    if (this.state.mainWindow && !this.state.mainWindow.isDestroyed()) {
+      this.state.mainWindow.close();
+    }
+  }
+}
