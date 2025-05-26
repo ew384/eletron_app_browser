@@ -161,3 +161,22 @@ MIT License
 - ✅ 显示主界面，有"创建账号"按钮  
 - ✅ 点击按钮能弹出基础的浏览器窗口
 - ✅ 代码结构清晰，易于理解和修改
+## 🌟 GitHub仓库
+
+[![GitHub stars](https://img.shields.io/github/stars/ew384/electron-browser-manager)](https://github.com/ew384/electron-browser-manager/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/ew384/electron-browser-manager)](https://github.com/ew384/electron-browser-manager/issues)
+[![GitHub license](https://img.shields.io/github/license/ew384/electron-browser-manager)](https://github.com/ew384/electron-browser-manager/blob/main/LICENSE)
+
+## 🤝 贡献
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+## 📞 联系方式
+
+- GitHub: [@ew384](https://github.com/ew384)
+- Email: ew384@cornell.edu
+
