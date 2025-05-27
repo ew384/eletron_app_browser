@@ -1,150 +1,127 @@
-/**
- * IPC处理器 - 主进程与渲染进程通信桥梁
- */
-import { ipcMain } from 'electron';
-import { IPC_CHANNELS, APP_CONFIG } from '../shared/constants';
-import type { WindowManager } from './window-manager';
-import type { IpcResponse, AccountConfig } from '../shared/types';
+import { ipcMain, BrowserWindow } from 'electron';
+import { WindowManager } from './window-manager';
+import { FingerprintGenerator } from './fingerprint/generator';
+import { FingerprintValidator } from './fingerprint/validator';
+import { FingerprintConfig, BrowserAccount, AccountConfig } from '../shared/types';
 
-export function setupIpcHandlers(windowManager: WindowManager): void {
-  // 浏览器实例管理
-  ipcMain.handle(
-    IPC_CHANNELS.CREATE_BROWSER_INSTANCE,
-    async (event, accountId: string, config?: AccountConfig): Promise<IpcResponse> => {
-      try {
-        const instance = await windowManager.createBrowserInstance(accountId, config);
-        return {
-          success: true,
-          data: instance
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
+const windowManager = new WindowManager();
+
+// 账号管理
+ipcMain.handle('create-account', async (event, account: BrowserAccount) => {
+  try {
+    // 如果没有指纹配置，自动生成
+    if (!account.config?.fingerprint) {
+      const fingerprint = FingerprintGenerator.generateFingerprint(account.id);
+      account.config = { ...account.config, fingerprint };
     }
-  );
+    
+    // 这里应该调用 AccountStorage，暂时简化
+    return { success: true, account };
+  } catch (error: any) {
+    console.error('Failed to create account:', error);
+    return { success: false, error: error.message };
+  }
+});
 
-  ipcMain.handle(
-    IPC_CHANNELS.DESTROY_BROWSER_INSTANCE,
-    async (event, accountId: string): Promise<IpcResponse> => {
-      try {
-        const success = windowManager.destroyInstance(accountId);
-        return {
-          success,
-          data: success
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
+ipcMain.handle('get-accounts', async () => {
+  try {
+    // 暂时返回空数组，实际应该从 AccountStorage 获取
+    const accounts: BrowserAccount[] = [];
+    return { success: true, accounts };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-account', async (event, accountId: string) => {
+  try {
+    // 先关闭浏览器实例
+    await windowManager.closeInstance(accountId);
+    // 这里应该调用 AccountStorage.deleteAccount
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 浏览器实例管理
+ipcMain.handle('create-browser-instance', async (event, accountId: string, config: AccountConfig) => {
+  try {
+    const instance = await windowManager.createBrowserInstance(accountId, config);
+    return { success: true, instance };
+  } catch (error: any) {
+    console.error('Failed to create browser instance:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('close-browser-instance', async (event, accountId: string) => {
+  try {
+    await windowManager.closeInstance(accountId);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-browser-instances', async () => {
+  try {
+    const instances = windowManager.getAllInstances();
+    return { success: true, instances };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 指纹管理
+ipcMain.handle('get-fingerprint-config', async (event) => {
+  const webContents = event.sender;
+  const window = BrowserWindow.fromWebContents(webContents);
+  
+  // 通过窗口ID找到对应的账号
+  for (const instance of windowManager.getAllInstances()) {
+    if (instance.windowId === window?.id) {
+      const config = windowManager.getFingerprintConfig(instance.accountId);
+      return { success: true, config };
     }
-  );
+  }
+  
+  return { success: false, error: 'No fingerprint config found' };
+});
 
-  ipcMain.handle(
-    IPC_CHANNELS.GET_INSTANCE_STATUS,
-    async (event, accountId: string): Promise<IpcResponse<string>> => {
-      try {
-        const status = windowManager.getInstanceStatus(accountId);
-        return {
-          success: true,
-          data: status
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
+ipcMain.handle('update-fingerprint-config', async (event, config: FingerprintConfig) => {
+  const webContents = event.sender;
+  const window = BrowserWindow.fromWebContents(webContents);
+  
+  for (const instance of windowManager.getAllInstances()) {
+    if (instance.windowId === window?.id) {
+      windowManager.updateFingerprintConfig(instance.accountId, config);
+      
+      // 通知所有相关窗口配置已更新
+      webContents.send('fingerprint-config-updated', config);
+      
+      return { success: true };
     }
-  );
+  }
+  
+  return { success: false, error: 'Failed to update fingerprint config' };
+});
 
-  // 预留扩展处理器
-  ipcMain.handle(
-    IPC_CHANNELS.INJECT_FINGERPRINT,
-    async (event, accountId: string, fingerprint: any): Promise<IpcResponse> => {
-      try {
-        // 预留指纹注入实现
-        console.log('Fingerprint injection requested for:', accountId, fingerprint);
-        return {
-          success: true,
-          data: 'Fingerprint injection completed'
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    }
-  );
+ipcMain.handle('validate-fingerprint', async (event, config: FingerprintConfig) => {
+  try {
+    const quality = FingerprintValidator.validateFingerprint(config);
+    return { success: true, quality };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
 
-  ipcMain.handle(
-    IPC_CHANNELS.UPDATE_PROXY,
-    async (event, accountId: string, proxy: any): Promise<IpcResponse> => {
-      try {
-        // 预留代理更新实现
-        console.log('Proxy update requested for:', accountId, proxy);
-        return {
-          success: true,
-          data: 'Proxy update completed'
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    }
-  );
-
-  ipcMain.handle(
-    IPC_CHANNELS.EXECUTE_BEHAVIOR,
-    async (event, accountId: string, behavior: any): Promise<IpcResponse> => {
-      try {
-        // 预留行为执行实现
-        console.log('Behavior execution requested for:', accountId, behavior);
-        return {
-          success: true,
-          data: 'Behavior execution completed'
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    }
-  );
-
-  // 应用信息
-  ipcMain.handle('get-app-version', async (): Promise<string> => {
-    return APP_CONFIG.version;
-  });
-
-  // 窗口控制
-  ipcMain.on('minimize-window', (event) => {
-    const window = windowManager.getAllInstances().get('main') || 
-                   require('electron').BrowserWindow.getFocusedWindow();
-    window?.minimize();
-  });
-
-  ipcMain.on('maximize-window', (event) => {
-    const window = windowManager.getAllInstances().get('main') || 
-                   require('electron').BrowserWindow.getFocusedWindow();
-    if (window?.isMaximized()) {
-      window.restore();
-    } else {
-      window?.maximize();
-    }
-  });
-
-  ipcMain.on('close-window', (event) => {
-    const window = windowManager.getAllInstances().get('main') || 
-                   require('electron').BrowserWindow.getFocusedWindow();
-    window?.close();
-  });
-}
+ipcMain.handle('generate-fingerprint', async (event, seed?: string) => {
+  try {
+    const config = FingerprintGenerator.generateFingerprint(seed);
+    const quality = FingerprintValidator.validateFingerprint(config);
+    return { success: true, config, quality };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});

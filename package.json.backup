@@ -5,14 +5,13 @@
   "main": "dist/main/index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
-    "dev:main": "npm run build:main && electron dist/main/index.js",
+    "dev:main": "tsc -p tsconfig.main.json && electron .",
     "dev:renderer": "vite",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
-    "start": "electron dist/main/index.js",
-    "package": "npm run build && electron-builder",
-    "watch:main": "tsc -p tsconfig.main.json --watch"
+    "start": "electron .",
+    "package": "npm run build && electron-builder"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

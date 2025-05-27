@@ -1,0 +1,1013 @@
+// ===== shared/types.ts 完整更新 =====
+export interface BrowserAccount {
+  id: string;
+  name: string;
+  status: 'idle' | 'running' | 'error';
+  createdAt: number;
+  config?: AccountConfig;
+}
+
+export interface BrowserInstance {
+  accountId: string;
+  windowId: number;
+  status: 'starting' | 'running' | 'stopped';
+  pid?: number;
+  url?: string;
+}
+
+export interface AccountConfig {
+  proxy?: string;
+  userAgent?: string;
+  fingerprint?: FingerprintConfig;
+  behavior?: BehaviorConfig;
+  cookies?: CookieConfig[];
+  localStorage?: LocalStorageConfig;
+}
+
+export interface FingerprintConfig {
+  canvas: CanvasFingerprintConfig;
+  webgl: WebGLFingerprintConfig;
+  audio: AudioFingerprintConfig;
+  navigator: NavigatorFingerprintConfig;
+  screen: ScreenFingerprintConfig;
+  fonts: FontFingerprintConfig;
+  timezone: TimezoneFingerprintConfig;
+  webrtc?: WebRTCFingerprintConfig;
+  battery?: BatteryFingerprintConfig;
+}
+
+export interface CanvasFingerprintConfig {
+  noise: number;        // 0-1, 噪声强度
+  enabled: boolean;
+  seed?: number;        // 噪声种子
+  algorithm: 'uniform' | 'gaussian' | 'perlin'; // 噪声算法
+}
+
+export interface WebGLFingerprintConfig {
+  vendor: string;
+  renderer: string;
+  enabled: boolean;
+  unmaskedVendor?: string;
+  unmaskedRenderer?: string;
+  version?: string;
+  shadingLanguageVersion?: string;
+  extensions?: string[];
+}
+
+export interface AudioFingerprintConfig {
+  noise: number;        // 0-1, 噪声强度
+  enabled: boolean;
+  seed?: number;
+  sampleRate?: number;
+  channelCount?: number;
+  latency?: number;
+}
+
+export interface NavigatorFingerprintConfig {
+  platform: string;
+  language: string;
+  languages: string[];
+  hardwareConcurrency: number;
+  maxTouchPoints: number;
+  deviceMemory?: number;
+  enabled: boolean;
+  userAgent?: string;
+  vendor?: string;
+  vendorSub?: string;
+  productSub?: string;
+  appVersion?: string;
+  cookieEnabled?: boolean;
+  onLine?: boolean;
+  javaEnabled?: boolean;
+}
+
+export interface ScreenFingerprintConfig {
+  width: number;
+  height: number;
+  pixelRatio: number;
+  colorDepth: number;
+  enabled: boolean;
+  availWidth?: number;
+  availHeight?: number;
+  orientation?: 'portrait' | 'landscape';
+}
+
+export interface FontFingerprintConfig {
+  available: string[];
+  enabled: boolean;
+  measurementMethod: 'canvas' | 'dom';
+}
+
+export interface TimezoneFingerprintConfig {
+  name: string;        // IANA timezone name
+  offset: number;      // minutes from UTC
+  enabled: boolean;
+  dst?: boolean;       // daylight saving time
+}
+
+export interface WebRTCFingerprintConfig {
+  enabled: boolean;
+  localIPs: string[];
+  publicIP?: string;
+  blockICE?: boolean;
+}
+
+export interface BatteryFingerprintConfig {
+  enabled: boolean;
+  level: number;       // 0-1
+  charging: boolean;
+  chargingTime?: number;
+  dischargingTime?: number;
+}
+
+export interface BehaviorConfig {
+  mouseMovement?: MouseBehaviorConfig;
+  typing?: TypingBehaviorConfig;
+  scrolling?: ScrollBehaviorConfig;
+  enabled: boolean;
+}
+
+export interface MouseBehaviorConfig {
+  speed: number;       // pixels per second
+  acceleration: number;
+  jitter: number;      // random movement variation
+  humanLike: boolean;
+}
+
+export interface TypingBehaviorConfig {
+  wpm: number;         // words per minute
+  errorRate: number;   // 0-1
+  rhythm: 'steady' | 'variable';
+}
+
+export interface ScrollBehaviorConfig {
+  speed: number;
+  smoothness: number;
+  pauseProbability: number;
+}
+
+export interface CookieConfig {
+  name: string;
+  value: string;
+  domain: string;
+  path?: string;
+  secure?: boolean;
+  httpOnly?: boolean;
+  sameSite?: 'Strict' | 'Lax' | 'None';
+  expirationDate?: number;
+}
+
+export interface LocalStorageConfig {
+  [key: string]: string;
+}
+
+export interface FingerprintQuality {
+  score: number;        // 0-100
+  issues: string[];
+  consistency: boolean;
+  entropy: number;
+  risk: 'low' | 'medium' | 'high';
+  recommendations: string[];
+}
+
+// ===== 使用示例和集成代码 =====
+
+// main/index.ts 集成示例
+import { app, BrowserWindow } from 'electron';
+import { WindowManager } from './window-manager';
+import './ipc-handlers'; // 注册IPC处理器
+
+const windowManager = new WindowManager();
+
+app.whenReady().then(() => {
+  // 创建主窗口
+  const mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  mainWindow.loadFile('dist/renderer/index.html');
+
+  // 示例：创建带指纹的浏览器实例
+  const createExampleAccount = async () => {
+    const config: AccountConfig = {
+      proxy: 'http://proxy.example.com:8080',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      fingerprint: {
+        canvas: {
+          noise: 0.2,
+          enabled: true,
+          seed: 123456,
+          algorithm: 'gaussian'
+        },
+        webgl: {
+          vendor: 'Google Inc. (NVIDIA)',
+          renderer: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+          enabled: true
+        },
+        audio: {
+          noise: 0.1,
+          enabled: true,
+          seed: 789101
+        },
+        navigator: {
+          platform: 'Win32',
+          language: 'en-US',
+          languages: ['en-US', 'en'],
+          hardwareConcurrency: 8,
+          maxTouchPoints: 0,
+          deviceMemory: 8,
+          enabled: true
+        },
+        screen: {
+          width: 1920,
+          height: 1080,
+          pixelRatio: 1,
+          colorDepth: 24,
+          enabled: true
+        },
+        fonts: {
+          available: ['Arial', 'Times New Roman', 'Helvetica', 'Georgia'],
+          enabled: true,
+          measurementMethod: 'canvas'
+        },
+        timezone: {
+          name: 'America/New_York',
+          offset: -300,
+          enabled: true
+        }
+      }
+    };
+
+    try {
+      const instance = await windowManager.createBrowserInstance('test-account-001', config);
+      console.log('Browser instance created:', instance);
+    } catch (error) {
+      console.error('Failed to create browser instance:', error);
+    }
+  };
+
+  // 延迟创建示例账号
+  setTimeout(createExampleAccount, 2000);
+});
+
+// ===== preload/index.ts 完整更新 =====
+import { contextBridge, ipcRenderer } from 'electron';
+import { injectAllFingerprints, ensureInjected } from './fingerprint';
+import { FingerprintConfig, FingerprintQuality } from '../shared/types';
+
+// 全局变量，用于存储指纹配置
+let globalFingerprintConfig: FingerprintConfig | null = null;
+
+// 在页面加载前注入指纹
+const injectFingerprints = async () => {
+  try {
+    // 从全局变量或主进程获取配置
+    let config = globalFingerprintConfig;
+    if (!config) {
+      config = await ipcRenderer.invoke('get-fingerprint-config');
+    }
+    
+    if (config) {
+      console.log('[Preload] Injecting fingerprints with config:', config);
+      ensureInjected(config);
+    } else {
+      console.warn('[Preload] No fingerprint config available');
+    }
+  } catch (error) {
+    console.error('[Preload] Error injecting fingerprints:', error);
+  }
+};
+
+// 监听配置更新
+ipcRenderer.on('fingerprint-config-updated', (event, config: FingerprintConfig) => {
+  globalFingerprintConfig = config;
+  console.log('[Preload] Fingerprint config updated:', config);
+});
+
+// 立即执行注入（针对已经加载的页面）
+injectFingerprints();
+
+// 监听DOM加载事件
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectFingerprints);
+} else {
+  injectFingerprints();
+}
+
+// 暴露API给渲染进程
+contextBridge.exposeInMainWorld('electronAPI', {
+  // 账号管理
+  createAccount: (account: BrowserAccount) => 
+    ipcRenderer.invoke('create-account', account),
+  getAccounts: () => 
+    ipcRenderer.invoke('get-accounts'),
+  deleteAccount: (accountId: string) => 
+    ipcRenderer.invoke('delete-account', accountId),
+  
+  // 浏览器实例管理
+  createBrowserInstance: (accountId: string, config: AccountConfig) =>
+    ipcRenderer.invoke('create-browser-instance', accountId, config),
+  closeBrowserInstance: (accountId: string) =>
+    ipcRenderer.invoke('close-browser-instance', accountId),
+  getBrowserInstances: () =>
+    ipcRenderer.invoke('get-browser-instances'),
+  
+  // 指纹管理
+  getFingerprintConfig: () => 
+    ipcRenderer.invoke('get-fingerprint-config'),
+  updateFingerprintConfig: (config: FingerprintConfig) => 
+    ipcRenderer.invoke('update-fingerprint-config', config),
+  validateFingerprint: (config: FingerprintConfig) =>
+    ipcRenderer.invoke('validate-fingerprint', config),
+  generateFingerprint: (seed?: string) =>
+    ipcRenderer.invoke('generate-fingerprint', seed),
+  
+  // 指纹测试和验证
+  testFingerprint: (url: string) =>
+    ipcRenderer.invoke('test-fingerprint', url),
+  getFingerprintQuality: (accountId: string) =>
+    ipcRenderer.invoke('get-fingerprint-quality', accountId),
+  
+  // 事件监听
+  onFingerprintUpdated: (callback: (config: FingerprintConfig) => void) => {
+    ipcRenderer.on('fingerprint-config-updated', (event, config) => callback(config));
+  },
+  
+  // 工具方法
+  openDevTools: (accountId: string) =>
+    ipcRenderer.invoke('open-dev-tools', accountId),
+  takeScreenshot: (accountId: string) =>
+    ipcRenderer.invoke('take-screenshot', accountId),
+  
+  // 移除监听器
+  removeAllListeners: (channel: string) =>
+    ipcRenderer.removeAllListeners(channel)
+});
+
+// ===== main/ipc-handlers.ts 完整更新 =====
+import { ipcMain, BrowserWindow } from 'electron';
+import { WindowManager } from './window-manager';
+import { FingerprintGenerator } from './fingerprint/generator';
+import { FingerprintValidator } from './fingerprint/validator';
+import { AccountStorage } from './storage/account-storage';
+import { FingerprintConfig, BrowserAccount, AccountConfig } from '../shared/types';
+
+const windowManager = new WindowManager();
+const accountStorage = new AccountStorage();
+
+// 账号管理
+ipcMain.handle('create-account', async (event, account: BrowserAccount) => {
+  try {
+    // 如果没有指纹配置，自动生成
+    if (!account.config?.fingerprint) {
+      const fingerprint = FingerprintGenerator.generateFingerprint(account.id);
+      account.config = { ...account.config, fingerprint };
+    }
+    
+    await accountStorage.saveAccount(account);
+    return { success: true, account };
+  } catch (error) {
+    console.error('Failed to create account:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-accounts', async () => {
+  try {
+    const accounts = await accountStorage.getAllAccounts();
+    return { success: true, accounts };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-account', async (event, accountId: string) => {
+  try {
+    // 先关闭浏览器实例
+    await windowManager.closeInstance(accountId);
+    await accountStorage.deleteAccount(accountId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 浏览器实例管理
+ipcMain.handle('create-browser-instance', async (event, accountId: string, config: AccountConfig) => {
+  try {
+    const instance = await windowManager.createBrowserInstance(accountId, config);
+    return { success: true, instance };
+  } catch (error) {
+    console.error('Failed to create browser instance:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('close-browser-instance', async (event, accountId: string) => {
+  try {
+    await windowManager.closeInstance(accountId);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-browser-instances', async () => {
+  try {
+    const instances = windowManager.getAllInstances();
+    return { success: true, instances };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 指纹管理
+ipcMain.handle('get-fingerprint-config', async (event) => {
+  const webContents = event.sender;
+  const window = BrowserWindow.fromWebContents(webContents);
+  
+  // 通过窗口ID找到对应的账号
+  for (const instance of windowManager.getAllInstances()) {
+    if (instance.windowId === window?.id) {
+      const config = windowManager.getFingerprintConfig(instance.accountId);
+      return { success: true, config };
+    }
+  }
+  
+  return { success: false, error: 'No fingerprint config found' };
+});
+
+ipcMain.handle('update-fingerprint-config', async (event, config: FingerprintConfig) => {
+  const webContents = event.sender;
+  const window = BrowserWindow.fromWebContents(webContents);
+  
+  for (const instance of windowManager.getAllInstances()) {
+    if (instance.windowId === window?.id) {
+      windowManager.updateFingerprintConfig(instance.accountId, config);
+      
+      // 通知所有相关窗口配置已更新
+      webContents.send('fingerprint-config-updated', config);
+      
+      return { success: true };
+    }
+  }
+  
+  return { success: false, error: 'Failed to update fingerprint config' };
+});
+
+ipcMain.handle('validate-fingerprint', async (event, config: FingerprintConfig) => {
+  try {
+    const quality = FingerprintValidator.validateFingerprint(config);
+    return { success: true, quality };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('generate-fingerprint', async (event, seed?: string) => {
+  try {
+    const config = FingerprintGenerator.generateFingerprint(seed);
+    const quality = FingerprintValidator.validateFingerprint(config);
+    return { success: true, config, quality };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 指纹测试
+ipcMain.handle('test-fingerprint', async (event, url: string) => {
+  try {
+    const webContents = event.sender;
+    const window = BrowserWindow.fromWebContents(webContents);
+    
+    if (window) {
+      await window.loadURL(url);
+      return { success: true };
+    }
+    
+    return { success: false, error: 'Window not found' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-fingerprint-quality', async (event, accountId: string) => {
+  try {
+    const config = windowManager.getFingerprintConfig(accountId);
+    if (config) {
+      const quality = FingerprintValidator.validateFingerprint(config);
+      return { success: true, quality };
+    }
+    return { success: false, error: 'No fingerprint config found' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// 工具方法
+ipcMain.handle('open-dev-tools', async (event, accountId: string) => {
+  try {
+    const instance = windowManager.getInstance(accountId);
+    if (instance) {
+      const window = BrowserWindow.fromId(instance.windowId);
+      if (window && !window.isDestroyed()) {
+        window.webContents.openDevTools();
+        return { success: true };
+      }
+    }
+    return { success: false, error: 'Browser instance not found' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('take-screenshot', async (event, accountId: string) => {
+  try {
+    const instance = windowManager.getInstance(accountId);
+    if (instance) {
+      const window = BrowserWindow.fromId(instance.windowId);
+      if (window && !window.isDestroyed()) {
+        const image = await window.capturePage();
+        const buffer = image.toPNG();
+        return { success: true, screenshot: buffer.toString('base64') };
+      }
+    }
+    return { success: false, error: 'Browser instance not found' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// ===== main/storage/account-storage.ts =====
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { app } from 'electron';
+import { BrowserAccount } from '../../shared/types';
+
+export class AccountStorage {
+  private readonly storageDir: string;
+  private readonly accountsFile: string;
+
+  constructor() {
+    this.storageDir = path.join(app.getPath('userData'), 'accounts');
+    this.accountsFile = path.join(this.storageDir, 'accounts.json');
+    this.ensureStorageDir();
+  }
+
+  private async ensureStorageDir() {
+    try {
+      await fs.mkdir(this.storageDir, { recursive: true });
+    } catch (error) {
+      console.error('Failed to create storage directory:', error);
+    }
+  }
+
+  async saveAccount(account: BrowserAccount): Promise<void> {
+    try {
+      const accounts = await this.getAllAccounts();
+      const existingIndex = accounts.findIndex(a => a.id === account.id);
+      
+      if (existingIndex >= 0) {
+        accounts[existingIndex] = account;
+      } else {
+        accounts.push(account);
+      }
+      
+      await fs.writeFile(this.accountsFile, JSON.stringify(accounts, null, 2));
+    } catch (error) {
+      console.error('Failed to save account:', error);
+      throw error;
+    }
+  }
+
+  async getAllAccounts(): Promise<BrowserAccount[]> {
+    try {
+      const data = await fs.readFile(this.accountsFile, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return []; // 文件不存在，返回空数组
+      }
+      console.error('Failed to load accounts:', error);
+      throw error;
+    }
+  }
+
+  async getAccount(accountId: string): Promise<BrowserAccount | null> {
+    try {
+      const accounts = await this.getAllAccounts();
+      return accounts.find(a => a.id === accountId) || null;
+    } catch (error) {
+      console.error('Failed to get account:', error);
+      return null;
+    }
+  }
+
+  async deleteAccount(accountId: string): Promise<void> {
+    try {
+      const accounts = await this.getAllAccounts();
+      const filteredAccounts = accounts.filter(a => a.id !== accountId);
+      await fs.writeFile(this.accountsFile, JSON.stringify(filteredAccounts, null, 2));
+    } catch (error) {
+      console.error('Failed to delete account:', error);
+      throw error;
+    }
+  }
+}
+
+// ===== 测试和验证工具 =====
+
+export class FingerprintTester {
+  static readonly TEST_URLS = {
+    canvas: 'https://browserleaks.com/canvas',
+    webgl: 'https://browserleaks.com/webgl',
+    audio: 'https://browserleaks.com/audio',
+    fonts: 'https://browserleaks.com/fonts',
+    general: 'https://amiunique.org/fingerprint',
+    comprehensive: 'https://coveryourtracks.eff.org/'
+  };
+
+  static async runFingerprintTest(windowManager: WindowManager, accountId: string): Promise<any> {
+    const instance = windowManager.getInstance(accountId);
+    if (!instance) {
+      throw new Error('Browser instance not found');
+    }
+
+    const window = BrowserWindow.fromId(instance.windowId);
+    if (!window || window.isDestroyed()) {
+      throw new Error('Browser window not available');
+    }
+
+    const results = {};
+
+    // 测试各个指纹组件
+    for (const [name, url] of Object.entries(this.TEST_URLS)) {
+      try {
+        console.log(`Testing ${name} fingerprint at ${url}`);
+        await window.loadURL(url);
+        
+        // 等待页面加载完成
+        await new Promise(resolve => {
+          window.webContents.once('did-finish-load', resolve);
+        });
+
+        // 执行特定的测试脚本
+        const result = await this.executeTestScript(window.webContents, name);
+        results[name] = result;
+        
+        // 短暂延迟，避免请求过快
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`Failed to test ${name}:`, error);
+        results[name] = { error: error.message };
+      }
+    }
+
+    return results;
+  }
+
+  private static async executeTestScript(webContents: any, testType: string): Promise<any> {
+    switch (testType) {
+      case 'canvas':
+        return await webContents.executeJavaScript(`
+          (function() {
+            try {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              ctx.textBaseline = 'top';
+              ctx.font = '14px Arial';
+              ctx.fillText('Browser fingerprint test 🎨', 2, 2);
+              return {
+                dataURL: canvas.toDataURL(),
+                width: canvas.width,
+                height: canvas.height
+              };
+            } catch (e) {
+              return { error: e.message };
+            }
+          })();
+        `);
+
+      case 'webgl':
+        return await webContents.executeJavaScript(`
+          (function() {
+            try {
+              const canvas = document.createElement('canvas');
+              const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+              if (!gl) return { error: 'WebGL not supported' };
+              
+              return {
+                vendor: gl.getParameter(gl.VENDOR),
+                renderer: gl.getParameter(gl.RENDERER),
+                version: gl.getParameter(gl.VERSION),
+                shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION)
+              };
+            } catch (e) {
+              return { error: e.message };
+            }
+          })();
+        `);
+
+      case 'audio':
+        return await webContents.executeJavaScript(`
+          (function() {
+            try {
+              const AudioContext = window.AudioContext || window.webkitAudioContext;
+              if (!AudioContext) return { error: 'AudioContext not supported' };
+              
+              const context = new AudioContext();
+              return {
+                sampleRate: context.sampleRate,
+                state: context.state,
+                maxChannelCount: context.destination.maxChannelCount
+              };
+            } catch (e) {
+              return { error: e.message };
+            }
+          })();
+        `);
+
+      default:
+        return { message: 'Generic fingerprint test completed' };
+    }
+  }
+}
+
+// ===== 性能监控和优化 =====
+
+export class FingerprintPerformanceProfiler {
+  private static metrics = new Map<string, number[]>();
+  
+  static startProfiler(operation: string): string {
+    const id = `${operation}-${Date.now()}-${Math.random()}`;
+    performance.mark(`${id}-start`);
+    return id;
+  }
+  
+  static endProfiler(id: string): number {
+    try {
+      performance.mark(`${id}-end`);
+      performance.measure(id, `${id}-start`, `${id}-end`);
+      
+      const measure = performance.getEntriesByName(id)[0];
+      const duration = measure.duration;
+      
+      // 记录性能指标
+      const operation = id.split('-')[0];
+      if (!this.metrics.has(operation)) {
+        this.metrics.set(operation, []);
+      }
+      this.metrics.get(operation)!.push(duration);
+      
+      // 清理性能标记
+      performance.clearMarks(`${id}-start`);
+      performance.clearMarks(`${id}-end`);
+      performance.clearMeasures(id);
+      
+      return duration;
+    } catch (error) {
+      console.error('Performance profiler error:', error);
+      return -1;
+    }
+  }
+  
+  static getMetrics(): Record<string, { avg: number; min: number; max: number; count: number }> {
+    const result = {};
+    
+    for (const [operation, durations] of this.metrics.entries()) {
+      if (durations.length > 0) {
+        result[operation] = {
+          avg: durations.reduce((a, b) => a + b, 0) / durations.length,
+          min: Math.min(...durations),
+          max: Math.max(...durations),
+          count: durations.length
+        };
+      }
+    }
+    
+    return result;
+  }
+  
+  static clearMetrics(): void {
+    this.metrics.clear();
+  }
+}
+
+// ===== 使用示例 =====
+
+/*
+// 在 renderer/App.tsx 中使用指纹配置组件
+
+import React, { useState, useEffect } from 'react';
+import { FingerprintConfigComponent } from './components/FingerprintConfig';
+import { BrowserAccount } from '../shared/types';
+
+export const App: React.FC = () => {
+  const [accounts, setAccounts] = useState<BrowserAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const loadAccounts = async () => {
+    try {
+      const result = await window.electronAPI.getAccounts();
+      if (result.success) {
+        setAccounts(result.accounts);
+      }
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
+    }
+  };
+
+  const createAccount = async () => {
+    const account: BrowserAccount = {
+      id: `account-${Date.now()}`,
+      name: `Account ${accounts.length + 1}`,
+      status: 'idle',
+      createdAt: Date.now()
+    };
+
+    try {
+      const result = await window.electronAPI.createAccount(account);
+      if (result.success) {
+        setAccounts([...accounts, result.account]);
+      }
+    } catch (error) {
+      console.error('Failed to create account:', error);
+    }
+  };
+
+  const launchBrowser = async (accountId: string) => {
+    try {
+      const result = await window.electronAPI.createBrowserInstance(accountId, {});
+      if (result.success) {
+        console.log('Browser launched:', result.instance);
+      }
+    } catch (error) {
+      console.error('Failed to launch browser:', error);
+    }
+  };
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">防关联浏览器</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">账号管理</h2>
+            <button
+              onClick={createAccount}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              创建账号
+            </button>
+          </div>
+          
+          <div className="space-y-2">
+            {accounts.map(account => (
+              <div key={account.id} className="flex items-center justify-between p-3 border rounded">
+                <div>
+                  <span className="font-medium">{account.name}</span>
+                  <span className={`ml-2 px-2 py-1 text-xs rounded ${
+                    account.status === 'running' ? 'bg-green-100 text-green-800' :
+                    account.status === 'error' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {account.status}
+                  </span>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setSelectedAccount(account.id)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    配置
+                  </button>
+                  <button
+                    onClick={() => launchBrowser(account.id)}
+                    className="text-green-600 hover:text-green-800"
+                  >
+                    启动
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <div>
+          {selectedAccount && (
+            <FingerprintConfigComponent
+              accountId={selectedAccount}
+              onConfigChange={(config) => {
+                console.log('Fingerprint config updated:', config);
+              }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+*/
+
+// ===== 部署和测试清单 =====
+
+/*
+## 部署步骤
+
+1. 安装依赖（如果需要）
+   npm install crypto-js uuid
+
+2. 更新 package.json 脚本
+   {
+     "scripts": {
+       "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
+       "dev:main": "tsc -p tsconfig.main.json && electron dist/main/index.js",
+       "dev:renderer": "vite",
+       "build": "npm run build:main && npm run build:renderer",
+       "build:main": "tsc -p tsconfig.main.json",
+       "build:renderer": "vite build",
+       "test:fingerprint": "node scripts/test-fingerprint.js"
+     }
+   }
+
+3. 创建测试脚本 scripts/test-fingerprint.js
+   const { FingerprintTester } = require('../dist/main/fingerprint/tester');
+   
+   async function runTests() {
+     console.log('Running fingerprint tests...');
+     // 测试逻辑
+   }
+   
+   runTests().catch(console.error);
+
+## 验收测试清单
+
+□ 基础功能测试
+  □ 创建账号并自动生成指纹配置
+  □ 启动浏览器实例并加载指纹
+  □ 配置保存和加载正常
+  □ 窗口关闭时清理资源
+
+□ 指纹一致性测试
+  □ 同一账号多次访问同一网站，指纹保持一致
+  □ 不同账号访问同一网站，显示不同指纹
+  □ 重启应用后指纹配置保持不变
+
+□ 指纹质量测试
+  □ Canvas 指纹：https://browserleaks.com/canvas
+  □ WebGL 指纹：https://browserleaks.com/webgl
+  □ Audio 指纹：https://amiunique.org/fingerprint
+  □ Navigator 指纹：检查平台、语言、CPU核心数等
+  □ 综合测试：https://coveryourtracks.eff.org/
+
+□ 性能测试
+  □ 应用启动时间 < 5秒
+  □ 创建浏览器实例时间 < 3秒
+  □ 指纹注入时间 < 100ms
+  □ 页面加载性能影响 < 5%
+
+□ 稳定性测试
+  □ 长时间运行无内存泄漏
+  □ 大量账号创建和删除
+  □ 异常情况处理（网络中断、代理失效等）
+
+□ 反检测测试
+  □ 通过常见的机器人检测
+  □ WebDriver 属性正确隐藏
+  □ 指纹熵值在合理范围内
+
+## 常见问题解决
+
+1. 指纹注入失败
+   - 检查 preload 脚本路径
+   - 确认 contextIsolation 设置
+   - 查看控制台错误信息
+
+2. 性能问题
+   - 减少噪声注入频率
+   - 优化字体检测算法
+   - 使用 Web Worker 处理耗时操作
+
+3. 反检测失败
+   - 更新 GPU 和 UserAgent 数据库
+   - 调整指纹参数范围
+   - 增加行为模拟功能
+
+4. 内存泄漏
+   - 及时清理事件监听器
+   - 正确处理 BrowserWindow 生命周期
+   - 定期检查对象引用
+
+*/

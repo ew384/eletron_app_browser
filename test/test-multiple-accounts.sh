@@ -1,3 +1,15 @@
+#!/bin/bash
+
+echo "🔄 多账号指纹对比测试"
+echo "===================="
+
+echo "📝 创建多账号测试版本的主进程..."
+
+# 备份原文件
+cp src/main/index.ts src/main/index.ts.backup
+
+# 创建多账号测试版本
+cat > src/main/index.ts << 'MULTI_EOF'
 import { app, BrowserWindow } from 'electron';
 import { WindowManager } from './window-manager';
 import './ipc-handlers';
@@ -121,3 +133,26 @@ app.whenReady().then(createWindow);
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+MULTI_EOF
+
+echo "✅ 多账号测试版本已创建"
+
+echo "🏗️  编译多账号测试版本..."
+if npm run build:main; then
+    echo "✅ 编译成功"
+    echo ""
+    echo "🚀 启动多账号指纹对比测试..."
+    echo "📱 将创建3个窗口，每个都有不同的指纹"
+    echo "📊 对比各窗口的指纹信息验证差异性"
+    echo ""
+    
+    NODE_ENV=production electron dist/main/index.js
+else
+    echo "❌ 编译失败"
+fi
+
+# 恢复原文件
+echo ""
+echo "🔄 恢复原始主进程文件..."
+mv src/main/index.ts.backup src/main/index.ts
+echo "✅ 原始文件已恢复"

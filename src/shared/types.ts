@@ -1,70 +1,120 @@
-/**
- * 核心类型定义 - 简洁设计，预留扩展接口
- */
-
 export interface BrowserAccount {
   id: string;
   name: string;
   status: 'idle' | 'running' | 'error';
   createdAt: number;
-  updatedAt?: number;
+  config?: AccountConfig;
 }
 
 export interface BrowserInstance {
   accountId: string;
   windowId: number;
   status: 'starting' | 'running' | 'stopped';
+  pid?: number;
   url?: string;
 }
 
-// 预留扩展接口 - 配置驱动架构
 export interface AccountConfig {
-  proxy?: ProxyConfig;
+  proxy?: string;
   userAgent?: string;
-  viewport?: ViewportConfig;
-  // 预留指纹配置接口
   fingerprint?: FingerprintConfig;
-  // 预留行为配置接口
   behavior?: BehaviorConfig;
-}
-
-export interface ProxyConfig {
-  type: 'http' | 'https' | 'socks5';
-  host: string;
-  port: number;
-  username?: string;
-  password?: string;
+  viewport?: ViewportConfig;
 }
 
 export interface ViewportConfig {
   width: number;
   height: number;
-  deviceScaleFactor?: number;
+  deviceScaleFactor: number;
 }
 
-// 预留接口 - 策略模式扩展点
 export interface FingerprintConfig {
-  canvas?: any;
-  webgl?: any;
-  audio?: any;
-  fonts?: any;
+  canvas: CanvasFingerprintConfig;
+  webgl: WebGLFingerprintConfig;
+  audio: AudioFingerprintConfig;
+  navigator: NavigatorFingerprintConfig;
+  screen: ScreenFingerprintConfig;
+  fonts: FontFingerprintConfig;
+  timezone: TimezoneFingerprintConfig;
+}
+
+export interface CanvasFingerprintConfig {
+  noise: number;
+  enabled: boolean;
+  seed?: number;
+  algorithm: 'uniform' | 'gaussian' | 'perlin';
+}
+
+export interface WebGLFingerprintConfig {
+  vendor: string;
+  renderer: string;
+  enabled: boolean;
+  unmaskedVendor?: string;
+  unmaskedRenderer?: string;
+}
+
+export interface AudioFingerprintConfig {
+  noise: number;
+  enabled: boolean;
+  seed?: number;
+}
+
+export interface NavigatorFingerprintConfig {
+  platform: string;
+  language: string;
+  languages: string[];
+  hardwareConcurrency: number;
+  maxTouchPoints: number;
+  deviceMemory?: number;
+  enabled: boolean;
+  userAgent?: string;
+}
+
+export interface ScreenFingerprintConfig {
+  width: number;
+  height: number;
+  pixelRatio: number;
+  colorDepth: number;
+  enabled: boolean;
+}
+
+export interface FontFingerprintConfig {
+  available: string[];
+  enabled: boolean;
+  measurementMethod: 'canvas' | 'dom';
+}
+
+export interface TimezoneFingerprintConfig {
+  name: string;
+  offset: number;
+  enabled: boolean;
 }
 
 export interface BehaviorConfig {
-  mouseMovement?: any;
-  typingPattern?: any;
-  scrollPattern?: any;
+  mouseMovement?: MouseBehaviorConfig;
+  typing?: TypingBehaviorConfig;
+  enabled: boolean;
 }
 
-// IPC 通信类型
-export interface IpcResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
+export interface MouseBehaviorConfig {
+  speed: number;
+  acceleration: number;
+  jitter: number;
 }
 
-// 窗口管理器状态
+export interface TypingBehaviorConfig {
+  wpm: number;
+  errorRate: number;
+}
+
+export interface FingerprintQuality {
+  score: number;
+  issues: string[];
+  consistency: boolean;
+  entropy: number;
+}
+
 export interface WindowManagerState {
-  mainWindow?: Electron.BrowserWindow;
-  browserInstances: Map<string, Electron.BrowserWindow>;
+  instances: Map<string, BrowserInstance>;
+  configs: Map<string, FingerprintConfig>;
 }

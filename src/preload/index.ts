@@ -1,53 +1,56 @@
-/**
- * 预加载脚本 - 安全的IPC桥接
- */
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '../shared/constants';
-import type { BrowserAccount, AccountConfig, IpcResponse } from '../shared/types';
+import { ensureInjected } from './fingerprint';
+import { FingerprintConfig, BrowserAccount, AccountConfig } from '../shared/types';
 
-// 定义安全的API接口
-const electronAPI = {
-  // 账号管理
-  createBrowserInstance: (accountId: string, config?: AccountConfig): Promise<IpcResponse> =>
-    ipcRenderer.invoke(IPC_CHANNELS.CREATE_BROWSER_INSTANCE, accountId, config),
-  
-  destroyBrowserInstance: (accountId: string): Promise<IpcResponse> =>
-    ipcRenderer.invoke(IPC_CHANNELS.DESTROY_BROWSER_INSTANCE, accountId),
-  
-  getInstanceStatus: (accountId: string): Promise<IpcResponse<string>> =>
-    ipcRenderer.invoke(IPC_CHANNELS.GET_INSTANCE_STATUS, accountId),
-  
-  // 预留扩展方法
-  injectFingerprint: (accountId: string, fingerprint: any): Promise<IpcResponse> =>
-    ipcRenderer.invoke(IPC_CHANNELS.INJECT_FINGERPRINT, accountId, fingerprint),
-  
-  updateProxy: (accountId: string, proxy: any): Promise<IpcResponse> =>
-    ipcRenderer.invoke(IPC_CHANNELS.UPDATE_PROXY, accountId, proxy),
-  
-  executeBehavior: (accountId: string, behavior: any): Promise<IpcResponse> =>
-    ipcRenderer.invoke(IPC_CHANNELS.EXECUTE_BEHAVIOR, accountId, behavior),
-  
-  // 应用信息
-  getAppVersion: (): Promise<string> =>
-    ipcRenderer.invoke('get-app-version'),
-  
-  // 窗口控制
-  minimizeWindow: (): void =>
-    ipcRenderer.send('minimize-window'),
-  
-  maximizeWindow: (): void =>
-    ipcRenderer.send('maximize-window'),
-  
-  closeWindow: (): void =>
-    ipcRenderer.send('close-window')
+// 在DOM加载前注入指纹
+const injectFingerprints = async () => {
+  try {
+    const config = await ipcRenderer.invoke('get-fingerprint-config');
+    if (config) {
+      console.log('[Preload] Injecting fingerprints with config:', config);
+      ensureInjected(config);
+    } else {
+      console.warn('[Preload] No fingerprint config available');
+    }
+  } catch (error) {
+    console.error('[Preload] Error injecting fingerprints:', error);
+  }
 };
 
-// 类型安全的API暴露
-declare global {
-  interface Window {
-    electronAPI: typeof electronAPI;
+// 等待DOM加载
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectFingerprints);
+  } else {
+    injectFingerprints();
   }
 }
 
-// 安全暴露API到渲染进程
-contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+// 暴露API给渲染进程
+contextBridge.exposeInMainWorld('electronAPI', {
+  // 账号管理
+  createAccount: (account: BrowserAccount) => 
+    ipcRenderer.invoke('create-account', account),
+  getAccounts: () => 
+    ipcRenderer.invoke('get-accounts'),
+  deleteAccount: (accountId: string) => 
+    ipcRenderer.invoke('delete-account', accountId),
+  
+  // 浏览器实例管理
+  createBrowserInstance: (accountId: string, config: AccountConfig) =>
+    ipcRenderer.invoke('create-browser-instance', accountId, config),
+  closeBrowserInstance: (accountId: string) =>
+    ipcRenderer.invoke('close-browser-instance', accountId),
+  getBrowserInstances: () =>
+    ipcRenderer.invoke('get-browser-instances'),
+  
+  // 指纹管理
+  getFingerprintConfig: () => 
+    ipcRenderer.invoke('get-fingerprint-config'),
+  updateFingerprintConfig: (config: FingerprintConfig) => 
+    ipcRenderer.invoke('update-fingerprint-config', config),
+  validateFingerprint: (config: FingerprintConfig) =>
+    ipcRenderer.invoke('validate-fingerprint', config),
+  generateFingerprint: (seed?: string) =>
+    ipcRenderer.invoke('generate-fingerprint', seed)
+});

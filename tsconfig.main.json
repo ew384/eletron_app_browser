@@ -1,33 +1,27 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "node",
-    "lib": ["ES2020"],
-    "outDir": "dist",
-    "rootDir": "src",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+    "outDir": "./dist",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "declaration": false,
-    "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"],
-      "@shared/*": ["src/shared/*"]
-    }
+    "sourceMap": true
   },
   "include": [
-    "src/main/**/*",
-    "src/shared/**/*",
+    "src/main/**/*", 
+    "src/shared/**/*", 
     "src/preload/**/*"
   ],
   "exclude": [
-    "node_modules",
+    "node_modules", 
     "dist",
-    "src/renderer/**/*"
+    "src/renderer"
   ]
 }
