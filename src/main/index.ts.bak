@@ -1,0 +1,41 @@
+import { app, BrowserWindow } from 'electron';
+import { WindowManager } from './window-manager';
+import { setupIpcHandlers } from './ipc-handlers';
+
+class App {
+  private windowManager: WindowManager;
+  private isDev: boolean;
+
+  constructor() {
+    this.isDev = process.env.NODE_ENV === 'development';
+    this.windowManager = new WindowManager(this.isDev);
+    this.init();
+  }
+
+  private async init(): Promise<void> {
+    await app.whenReady();
+    setupIpcHandlers(this.windowManager);
+    await this.windowManager.createMainWindow();
+    this.setupAppEventHandlers();
+  }
+
+  private setupAppEventHandlers(): void {
+    app.on('window-all-closed', () => {
+      if (process.platform !== 'darwin') {
+        app.quit();
+      }
+    });
+
+    app.on('activate', async () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        await this.windowManager.createMainWindow();
+      }
+    });
+
+    app.on('before-quit', () => {
+      this.windowManager.cleanup();
+    });
+  }
+}
+
+new App();
